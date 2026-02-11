@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Study Quest</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css">
+  <style>
+    :root {
+      --font: 'Noto Sans JP', sans-serif;
+      --bg: #f5f5f5;
+      --text: #1a1a1a;
+      --primary: #1976d2;
+      --primary-hover: #1565c0;
+      --surface: #fff;
+      --border: #ddd;
+    }
+    [data-theme="light"] { --bg: #f5f5f5; --text: #1a1a1a; --primary: #1976d2; --surface: #fff; --border: #ddd; }
+    [data-theme="dark"] { --bg: #121212; --text: #e0e0e0; --primary: #42a5f5; --surface: #1e1e1e; --border: #333; }
+    [data-theme="ocean"] { --bg: #e3f2fd; --text: #0d47a1; --primary: #0288d1; --surface: #fff; --border: #90caf9; }
+    [data-theme="forest"] { --bg: #e8f5e9; --text: #1b5e20; --primary: #388e3c; --surface: #fff; --border: #81c784; }
+    [data-theme="sunset"] { --bg: #fff3e0; --text: #e65100; --primary: #f57c00; --surface: #fff; --border: #ffb74d; }
+    [data-theme="sakura"] { --bg: #fce4ec; --text: #880e4f; --primary: #c2185b; --surface: #fff; --border: #f48fb1; }
+    * { box-sizing: border-box; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; transition: background .3s, color .3s; }
+    .load-screen {
+      position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999;
+      transition: opacity .5s ease-out;
+    }
+    .load-screen.hide { opacity: 0; pointer-events: none; }
+    .load-screen .spinner { width: 48px; height: 48px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #app { max-width: 600px; margin: 0 auto; padding: 16px; }
+    .view { display: none; }
+    .view.active { display: block; }
+    h1 { font-size: 1.5rem; margin: 0 0 16px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; margin-bottom: 4px; font-size: .9rem; }
+    input, select, button, textarea {
+      font-family: var(--font); font-size: 1rem; width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--surface); color: var(--text);
+    }
+    button { cursor: pointer; background: var(--primary); color: #fff; border: none; margin-top: 8px; }
+    button:hover:not(:disabled) { background: var(--primary-hover); }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    button.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    a { color: var(--primary); }
+    .link-bar { margin-top: 16px; font-size: .9rem; }
+    .msg { padding: 12px; border-radius: 8px; margin-bottom: 12px; background: rgba(0,0,0,.05); }
+    .msg.error { background: #ffebee; color: #c62828; }
+    .rank-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 12px 0; }
+    .top5-list { list-style: none; padding: 0; margin: 8px 0 0; }
+    .top5-list li { padding: 4px 0; }
+    .question-block { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 12px 0; }
+    .choice-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .choice-row input[type="radio"] { flex-shrink: 0; margin: 0; width: auto; min-width: 1.2em; height: 1.2em; }
+    .result-ok { color: #2e7d32; }
+    .result-ng { color: #c62828; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .icon-btn { width: auto; padding: 8px; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.show { display: flex; }
+    .modal { background: var(--surface); border-radius: 12px; padding: 20px; max-width: 90%; width: 360px; }
+    .modal h3 { margin: 0 0 12px; }
+    .modal-close { float: right; cursor: pointer; }
+    .theme-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .theme-options label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .theme-options input[type="radio"] { width: auto; flex-shrink: 0; margin: 0; min-width: 1.2em; height: 1.2em; }
+    .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.3); display: none; align-items: center; justify-content: center; z-index: 9998; }
+    .loading-overlay.show { display: flex; }
+  </style>
+</head>
+<body data-theme="light">
+  <div id="loadScreen" class="load-screen"><div class="spinner"></div></div>
+  <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+  <div id="app">
+    <div id="viewLogin" class="view active">
+      <h1>Study Quest</h1>
+      <p id="loginNoStudents" class="msg" style="display:none;">生徒がまだ登録されていません。先生に連絡してください。</p>
+      <p id="loginMsg" class="msg" style="display:none;"></p>
+      <div class="form-group">
+        <label for="loginName">名前を選択</label>
+        <select id="loginName"><option value="">-- 選択 --</option></select>
+      </div>
+      <div class="form-group">
+        <label for="loginPassword">パスワード（4桁）</label>
+        <input type="password" id="loginPassword" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="4桁の数字">
+      </div>
+      <button type="button" id="btnLogin">ログイン</button>
+      <div class="link-bar"><a href="#" id="linkAdmin">管理画面</a></div>
+    </div>
+    <div id="viewNickname" class="view">
+      <h1>ニックネームの設定</h1>
+      <p>アプリ内で表示する名前を入力してください（20文字まで）</p>
+      <p id="nickMsg" class="msg" style="display:none;"></p>
+      <div class="form-group">
+        <label for="nickInput">ニックネーム</label>
+        <input type="text" id="nickInput" maxlength="20" placeholder="ニックネーム">
+      </div>
+      <button type="button" id="btnNickOk">登録して始める</button>
+    </div>
+    <div id="viewMain" class="view">
+      <div class="toolbar">
+        <h1 style="margin:0;">Study Quest</h1>
+        <button type="button" class="icon-btn" id="btnSettings" title="設定"><span class="material-icons">settings</span></button>
+      </div>
+      <div class="link-bar" style="margin-bottom:8px;"><a href="#" id="linkAdmin2">管理画面</a></div>
+      <div id="mainGameClear" style="display:none;">
+        <p class="msg">ゲームクリア</p>
+        <p>おめでとうございます！</p>
+      </div>
+      <div id="mainContent">
+        <p>現在のレベル: <strong id="mainLevel">1</strong></p>
+        <p id="mainRank">順位: --</p>
+        <div class="rank-box">
+          <strong>上位5人</strong>
+          <ul class="top5-list" id="mainTop5"></ul>
+        </div>
+        <p id="mainMessage" class="msg" style="display:none;"></p>
+        <button type="button" id="btnChallenge">課題に挑戦</button>
+        <p id="mainCleared" style="display:none; color: var(--text);">このレベルはクリア済みです</p>
+      </div>
+    </div>
+    <div id="viewChallenge" class="view">
+      <h1>課題に挑戦</h1>
+      <p id="challengeMsg" class="msg" style="display:none;"></p>
+      <div id="challengeAuth">
+        <div class="form-group">
+          <label>名前を選択</label>
+          <select id="challengeName"><option value="">-- 選択 --</option></select>
+        </div>
+        <div class="form-group">
+          <label>パスワード（4桁）</label>
+          <input type="password" id="challengePassword" maxlength="4" pattern="[0-9]*">
+        </div>
+        <button type="button" id="btnChallengeStart">問題を表示</button>
+        <button type="button" class="secondary" id="btnChallengeBack">戻る</button>
+      </div>
+      <div id="challengeQuestions" style="display:none;">
+        <div id="challengeQList"></div>
+        <button type="button" id="btnSubmit">回答する</button>
+      </div>
+    </div>
+    <div id="viewResult" class="view">
+      <h1>結果</h1>
+      <div id="resultList"></div>
+      <p id="resultSummary"></p>
+      <button type="button" id="btnResultBack">戻る</button>
+    </div>
+    <div id="viewAdminLogin" class="view">
+      <h1>管理画面</h1>
+      <p id="adminLoginMsg" class="msg" style="display:none;"></p>
+      <div class="form-group">
+        <label>パスワード</label>
+        <input type="password" id="adminPassword" placeholder="パスワード">
+      </div>
+      <button type="button" id="btnAdminLogin">ログイン</button>
+      <button type="button" class="secondary" id="btnAdminLoginBack">戻る</button>
+    </div>
+    <div id="viewAdmin" class="view">
+      <div class="toolbar">
+        <h1 style="margin:0;">管理画面</h1>
+        <a href="#" id="linkBackToStudent">生徒画面に戻る</a>
+      </div>
+      <div id="adminTabs">
+        <button type="button" class="secondary" data-tab="students">生徒</button>
+        <button type="button" class="secondary" data-tab="problems">問題</button>
+        <button type="button" class="secondary" data-tab="password">パスワード変更</button>
+      </div>
+      <div id="adminStudents" class="admin-panel">
+        <h3>生徒の追加</h3>
+        <div class="form-group">
+          <input type="text" id="newStudentName" placeholder="名前">
+        </div>
+        <div class="form-group">
+          <input type="password" id="newStudentPassword" maxlength="4" placeholder="初期パスワード（4桁）">
+        </div>
+        <button type="button" id="btnAddStudent">追加</button>
+        <p id="adminStudentMsg" class="msg" style="display:none;"></p>
+        <h3>生徒一覧（名前順）</h3>
+        <ul id="adminStudentList"></ul>
+      </div>
+      <div id="adminProblems" class="admin-panel" style="display:none;">
+        <h3>問題の追加</h3>
+        <div class="form-group"><input type="text" id="newProbId" placeholder="問題ID"></div>
+        <div class="form-group"><input type="text" id="newProbText" placeholder="問題文"></div>
+        <div class="form-group"><input type="text" id="newProbC1" placeholder="選択肢1"></div>
+        <div class="form-group"><input type="text" id="newProbC2" placeholder="選択肢2"></div>
+        <div class="form-group"><input type="text" id="newProbC3" placeholder="選択肢3"></div>
+        <div class="form-group"><input type="text" id="newProbC4" placeholder="選択肢4"></div>
+        <div class="form-group"><input type="text" id="newProbCorrect" placeholder="正解"></div>
+        <div class="form-group">
+          <select id="newProbType"><option value="選択式">選択式</option><option value="記述式">記述式</option></select>
+        </div>
+        <div class="form-group"><input type="number" id="newProbLevel" min="1" max="20" placeholder="レベル（1-20）"></div>
+        <button type="button" id="btnAddProblem">追加</button>
+        <p id="adminProblemMsg" class="msg" style="display:none;"></p>
+        <h3>問題一覧（問題ID順）</h3>
+        <ul id="adminProblemList"></ul>
+      </div>
+      <div id="adminPanelPwd" class="admin-panel" style="display:none;">
+        <h3>教師パスワードの変更</h3>
+        <div class="form-group"><input type="password" id="adminCurrentPwd" placeholder="現在のパスワード"></div>
+        <div class="form-group"><input type="password" id="adminNewPwd" placeholder="新しいパスワード"></div>
+        <button type="button" id="btnChangeTeacherPwd">変更する</button>
+        <p id="adminPwdMsg" class="msg" style="display:none;"></p>
+      </div>
+    </div>
+  </div>
+  <div id="modalSettings" class="modal-overlay">
+    <div class="modal">
+      <span class="modal-close material-icons" id="modalSettingsClose">close</span>
+      <h3>設定</h3>
+      <p>テーマ</p>
+      <div class="theme-options" id="themeOptions">
+        <label><input type="radio" name="theme" value="light">ライト</label>
+        <label><input type="radio" name="theme" value="dark">ダーク</label>
+        <label><input type="radio" name="theme" value="ocean">オーシャン</label>
+        <label><input type="radio" name="theme" value="forest">フォレスト</label>
+        <label><input type="radio" name="theme" value="sunset">サンセット</label>
+        <label><input type="radio" name="theme" value="sakura">サクラ</label>
+      </div>
+      <button type="button" class="secondary" id="btnResetSettings">リセット</button>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+  <script>
+    var state = { name: '', password: '', currentQuestions: [], lastMainData: null };
+    function applyTheme(theme) {
+      document.body.setAttribute('data-theme', theme || 'light');
+      if (theme) try { localStorage.setItem('sq_theme', theme); } catch (e) {}
+    }
+    function showLoadScreen(show) {
+      var el = document.getElementById('loadScreen');
+      if (show) el.classList.remove('hide'); else el.classList.add('hide');
+    }
+    function showLoading(show) {
+      var el = document.getElementById('loadingOverlay');
+      if (show) el.classList.add('show'); else el.classList.remove('show');
+    }
+    function showView(id) {
+      document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+      var v = document.getElementById(id);
+      if (v) v.classList.add('active');
+    }
+    function showMsg(elId, text, isError) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      el.textContent = text || '';
+      el.className = 'msg' + (isError ? ' error' : '');
+      el.style.display = text ? 'block' : 'none';
+    }
+    function fillStudentSelect(selectId) {
+      showLoading(true);
+      google.script.run.withSuccessHandler(function(res) {
+        showLoading(false);
+        var sel = document.getElementById(selectId);
+        if (!sel) return;
+        sel.innerHTML = '<option value="">-- 選択 --</option>';
+        if (res.success && res.names) {
+          res.names.forEach(function(n) {
+            var opt = document.createElement('option');
+            opt.value = n;
+            opt.textContent = n;
+            sel.appendChild(opt);
+          });
+        }
+        var noStudents = document.getElementById('loginNoStudents');
+        if (noStudents && (!res.names || res.names.length === 0)) noStudents.style.display = 'block';
+        else if (noStudents) noStudents.style.display = 'none';
+      }).withFailureHandler(function() { showLoading(false); }).getStudentList();
+    }
+    function startTour() {
+      if (typeof driver !== 'undefined') {
+        driver.destroy();
+        driver({
+          showProgress: true,
+          steps: [
+            { element: '#mainLevel', popover: { title: 'レベル', description: '現在のレベルが表示されます。' } },
+            { element: '#mainRank', popover: { title: '順位', description: '参加者の中での順位が表示されます。' } },
+            { element: '.rank-box', popover: { title: '上位5人', description: '上位5人のニックネームが表示されます。' } },
+            { element: '#btnChallenge', popover: { title: '課題に挑戦', description: 'ここを押すと、現在のレベルの問題に挑戦できます。' } },
+            { element: '#btnSettings', popover: { title: '設定', description: 'テーマや表示の設定を変更できます。' } }
+          ]
+        }).drive();
+      }
+    }
+    setTimeout(function() {
+      var t = '';
+      try { t = localStorage.getItem('sq_theme'); } catch (e) {}
+      applyTheme(t || 'light');
+      showLoadScreen(false);
+    }, 800);
+    document.getElementById('btnLogin').addEventListener('click', function() {
+      var name = document.getElementById('loginName').value.trim();
+      var pwd = document.getElementById('loginPassword').value;
+      if (!name) { showMsg('loginMsg', '名前を選択してください', true); return; }
+      showLoading(true);
+      document.getElementById('btnLogin').disabled = true;
+      google.script.run.withSuccessHandler(function(res) {
+        showLoading(false);
+        document.getElementById('btnLogin').disabled = false;
+        if (!res.success) { showMsg('loginMsg', res.error || '名前またはパスワードが違います', true); return; }
+        showMsg('loginMsg', '');
+        state.name = name;
+        state.password = pwd;
+        if (res.needsNickname) showView('viewNickname');
+        else { loadMain(); showView('viewMain'); startTour(); }
+      }).withFailureHandler(function() {
+        showLoading(false);
+        document.getElementById('btnLogin').disabled = false;
+        showMsg('loginMsg', 'エラーが発生しました。しばらく経ってからお試しください。', true);
+      }).verifyStudent(name, pwd);
+    });
+    document.getElementById('btnNickOk').addEventListener('click', function() {
+      var nick = document.getElementById('nickInput').value.trim().slice(0, 20);
+      if (!nick) { showMsg('nickMsg', 'ニックネームを入力してください', true); return; }
+      showLoading(true);
+      google.script.run.withSuccessHandler(function(res) {
+        showLoading(false);
+        if (!res.success) { showMsg('nickMsg', res.error, true); return; }
+        loadMain();
+        showView('viewMain');
+        startTour();
+      }).withFailureHandler(function() {
+        showLoading(false);
+        showMsg('nickMsg', 'エラーが発生しました。しばらく経ってからお試しください。', true);
+      }).setNickname(state.name, state.password, nick);
+    });
+    function loadMain() {
+      showLoading(true);
+      google.script.run.withSuccessHandler(function(res) {
+        showLoading(false);
+        if (!res.success) { showMsg('mainMessage', res.error, true); return; }
+        state.lastMainData = res;
+        document.getElementById('mainLevel').textContent = res.level;
+        document.getElementById('mainRank').textContent = res.rank + '位 / ' + res.totalCount + '人中';
+        var top5 = document.getElementById('mainTop5');
+        top5.innerHTML = '';
+        (res.top5 || []).forEach(function(o) {
+          var li = document.createElement('li');
+          li.textContent = o.rank + '位: ' + (o.nickname || '（ニックネームなし）');
+          top5.appendChild(li);
+        });
+        var gameClear = res.gameClear;
+        document.getElementById('mainGameClear').style.display = gameClear ? 'block' : 'none';
+        document.getElementById('mainContent').style.display = gameClear ? 'none' : 'block';
+        if (!gameClear) {
+          document.getElementById('mainMessage').style.display = res.message ? 'block' : 'none';
+          document.getElementById('mainMessage').textContent = res.message || '';
+          document.getElementById('btnChallenge').style.display = res.canChallenge ? 'block' : 'none';
+          document.getElementById('mainCleared').style.display = res.canChallenge ? 'none' : 'block';
+        }
+      }).withFailureHandler(function() {
+        showLoading(false);
+        showMsg('mainMessage', 'エラーが発生しました。しばらく経ってからお試しください。', true);
+      }).getMainData(state.name, state.password);
+    }
+    document.getElementById('btnChallenge').addEventListener('click', function() {
+      state.currentQuestions = [];
+      document.getElementById('challengeQuestions').style.display = 'none';
+      document.getElementById('challengeAuth').style.display = 'block';
+      document.getElementById('challengeName').value = state.name;
+      document.getElementById('challengePassword').value = '';
+      fillStudentSelect('challengeName');
+      setTimeout(function() { document.getElementById('challengeName').value = state.name; }, 300);
+      showView('viewChallenge');
+    });
+    document.getElementById('btnChallengeBack').addEventListener('click', function() { loadMain(); showView('viewMain'); });
+    document.getElementById('btnChallengeStart').addEventListener('click', function() {
+      var name = document.getElementById('challengeName').value.trim();
+      var pwd = document.getElementById('challengePassword').value;
+      if (!name || !pwd) { showMsg('challengeMsg', '名前とパスワードを入力してください', true); return; }
+      showLoading(true);
+      google.script.run.withSuccessHandler(function(res) {
+        showLoading(false);
+        if (!res.success) { showMsg('challengeMsg', res.error, true); return; }
+        showMsg('challengeMsg', '');
+        state.name = name;
+        state.password = pwd;
+        state.currentQuestions = res.questions || [];
+        renderQuestions();
+        document.getElementById('challengeAuth').style.display = 'none';
+        document.getElementById('challengeQuestions').style.display = 'block';
+      }).withFailureHandler(function() {
+        showLoading(false);
+        showMsg('challengeMsg', 'エラーが発生しました。しばらく経ってからお試しください。', true);
+      }).getQuestionsForChallenge(name, pwd);
+    });
+    function renderQuestions() {
+      var container = document.getElementById('challengeQList');
+      container.innerHTML = '';
+      state.currentQuestions.forEach(function(q, i) {
+        var div = document.createElement('div');
+        div.className = 'question-block';
+        div.dataset.index = i;
+        div.innerHTML = '<p><strong>問' + (i + 1) + '</strong> ' + escapeHtml(q.text) + '</p>';
+        if (q.type === '選択式' && q.choices && q.choices.length) {
+          q.choices.forEach(function(c) {
+            var label = document.createElement('label');
+            label.className = 'choice-row';
+            var radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'q' + i;
+            radio.value = c;
+            label.appendChild(radio);
+            var span = document.createElement('span');
+            span.textContent = c;
+            label.appendChild(span);
+            div.appendChild(label);
+          });
+        } else {
+          var input = document.createElement('input');
+          input.type = 'text';
+          input.name = 'q' + i;
+          input.placeholder = '回答を入力';
+          div.appendChild(input);
+        }
+        container.appendChild(div);
+      });
+    }
+    function escapeHtml(s) {
+      if (s == null) return '';
+      var div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+    document.getElementById('btnSubmit').addEventListener('click', function() {
+      var answers = [];
+      for (var i = 0; i < state.currentQuestions.length; i++) {
+        var q = state.currentQuestions[i];
+        var val = '';
+        if (q.type === '選択式') {
+          var r = document.querySelector('input[name="q' + i + '"]:checked');
+          if (r) val = r.value;
+        } else {
+          var inp = document.querySelector('input[name="q' + i + '"]');
+          if (inp) val = inp.value;
+        }
+        answers.push({ id: q.id, answer: val });
+      }
+      showLoading(true);
+      document.getElementById('btnSubmit').disabled = true;
+      google.script.run.withSuccessHandler(function(res) {
+        showLoading(false);
+        document.getElementById('btnSubmit').disabled = false;
+        if (!res.success) { alert(res.error || 'エラーが発生しました。'); return; }
+        var list = document.getElementById('resultList');
+        list.innerHTML = '';
+        (res.results || []).forEach(function(r, i) {
+          var p = document.createElement('p');
+          p.className = r.correct ? 'result-ok' : 'result-ng';
+          p.textContent = r.correct ? '問' + (i + 1) + ': 正解です' : ('問' + (i + 1) + ': 不正解です。正解は' + escapeHtml(r.correctAnswer) + 'です');
+          list.appendChild(p);
+        });
+        document.getElementById('resultSummary').textContent = res.passed ? '合格です！ レベルが1つ上がりました。' : '不合格です。もう一度挑戦できます。';
+        showView('viewResult');
+      }).withFailureHandler(function() {
+        showLoading(false);
+        document.getElementById('btnSubmit').disabled = false;
+        alert('エラーが発生しました。しばらく経ってからお試しください。');
+      }).submitChallenge(state.name, state.password, answers);
+    });
+    document.getElementById('btnResultBack').addEventListener('click', function() {
+      loadMain();
+      showView('viewMain');
+    });
+    document.getElementById('linkAdmin').addEventListener('click', function(e) { e.preventDefault(); showView('viewAdminLogin'); });
+    document.getElementById('linkAdmin2').addEventListener('click', function(e) { e.preventDefault(); showView('viewAdminLogin'); });
+    document.getElementById('btnAdminLoginBack').addEventListener('click', function() { showView('viewLogin'); });
+    document.getElementById('btnAdminLogin').addEventListener('click', function() {
+      var pwd = document.getElementById('adminPassword').value;
+      showLoading(true);
+      google.script.run.withSuccessHandler(function(res) {
+        showLoading(false);
+        if (!res.success) { showMsg('adminLoginMsg', 'パスワードが違います', true); return; }
+        showMsg('adminLoginMsg', '');
+        showView('viewAdmin');
+        loadAdminStudents();
+        loadAdminProblems();
+      }).withFailureHandler(function() { showLoading(false); }).verifyTeacher(pwd);
+    });
+    document.getElementById('linkBackToStudent').addEventListener('click', function(e) { e.preventDefault(); showView('viewLogin'); });
+    document.querySelectorAll('#adminTabs [data-tab]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.admin-panel').forEach(function(p) { p.style.display = 'none'; });
+        var tab = this.getAttribute('data-tab');
+        if (tab === 'students') document.getElementById('adminStudents').style.display = 'block';
+        else if (tab === 'problems') document.getElementById('adminProblems').style.display = 'block';
+        else if (tab === 'password') document.getElementById('adminPanelPwd').style.display = 'block';
+      });
+    });
+    function loadAdminStudents() {
+      google.script.run.withSuccessHandler(function(res) {
+        if (!res.success) return;
+        var ul = document.getElementById('adminStudentList');
+        ul.innerHTML = '';
+        (res.students || []).forEach(function(s) {
+          var li = document.createElement('li');
+          li.innerHTML = s.name + ' — ' + (s.nickname || '（未設定）') + ' Lv.' + s.level + ' クリア' + s.cleared + '回 ' +
+            '<button type="button" class="secondary icon-btn" data-action="nick" data-name="' + escapeHtml(s.name) + '">ニックネーム変更</button> ' +
+            '<button type="button" class="secondary icon-btn" data-action="resetpwd" data-name="' + escapeHtml(s.name) + '">パスワードリセット</button> ' +
+            '<button type="button" class="secondary icon-btn" data-action="delete" data-name="' + escapeHtml(s.name) + '">削除</button>';
+          ul.appendChild(li);
+        });
+        ul.querySelectorAll('[data-action="delete"]').forEach(function(b) {
+          b.addEventListener('click', function() {
+            if (!confirm('本当に削除しますか？ 削除したデータは復元できません。')) return;
+            var name = this.getAttribute('data-name');
+            showLoading(true);
+            google.script.run.withSuccessHandler(function(r) {
+              showLoading(false);
+              if (r.success) loadAdminStudents(); else alert(r.error);
+            }).withFailureHandler(function() { showLoading(false); }).deleteStudent(name);
+          });
+        });
+        ul.querySelectorAll('[data-action="resetpwd"]').forEach(function(b) {
+          b.addEventListener('click', function() {
+            var name = this.getAttribute('data-name');
+            var np = prompt('新しい4桁パスワードを入力');
+            if (np === null) return;
+            if (!/^\d{4}$/.test(np)) { alert('4桁の数字で入力してください'); return; }
+            showLoading(true);
+            google.script.run.withSuccessHandler(function(r) {
+              showLoading(false);
+              if (r.success) loadAdminStudents(); else alert(r.error);
+            }).withFailureHandler(function() { showLoading(false); }).resetStudentPassword(name, np);
+          });
+        });
+        ul.querySelectorAll('[data-action="nick"]').forEach(function(b) {
+          b.addEventListener('click', function() {
+            var name = this.getAttribute('data-name');
+            var nick = prompt('新しいニックネーム（20文字まで）', '');
+            if (nick === null) return;
+            nick = nick.trim().slice(0, 20);
+            showLoading(true);
+            google.script.run.withSuccessHandler(function(r) {
+              showLoading(false);
+              if (r.success) loadAdminStudents(); else alert(r.error);
+            }).withFailureHandler(function() { showLoading(false); }).updateStudentNickname(name, nick);
+          });
+        });
+      }).getStudents();
+    }
+    function loadAdminProblems() {
+      google.script.run.withSuccessHandler(function(res) {
+        if (!res.success) return;
+        var ul = document.getElementById('adminProblemList');
+        ul.innerHTML = '';
+        (res.problems || []).forEach(function(p) {
+          var li = document.createElement('li');
+          li.textContent = p.id + ' Lv.' + p.level + ' ' + (p.type || '') + ' — ';
+          var delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.className = 'secondary icon-btn';
+          delBtn.textContent = '削除';
+          delBtn.dataset.row = p.rowIndex;
+          delBtn.addEventListener('click', function() {
+            if (!confirm('この問題を削除しますか？')) return;
+            showLoading(true);
+            google.script.run.withSuccessHandler(function(r) {
+              showLoading(false);
+              if (r.success) loadAdminProblems(); else alert(r.error);
+            }).withFailureHandler(function() { showLoading(false); }).deleteProblem(this.dataset.row);
+          });
+          li.appendChild(delBtn);
+          ul.appendChild(li);
+        });
+      }).getProblems();
+    }
+    document.getElementById('btnAddStudent').addEventListener('click', function() {
+      var name = document.getElementById('newStudentName').value.trim();
+      var pwd = document.getElementById('newStudentPassword').value;
+      if (!name) { showMsg('adminStudentMsg', '名前を入力してください', true); return; }
+      if (!/^\d{4}$/.test(pwd)) { showMsg('adminStudentMsg', 'パスワードは4桁の数字で入力してください', true); return; }
+      showLoading(true);
+      google.script.run.withSuccessHandler(function(res) {
+        showLoading(false);
+        if (!res.success) { showMsg('adminStudentMsg', res.error, true); return; }
+        showMsg('adminStudentMsg', '追加しました');
+        document.getElementById('newStudentName').value = '';
+        document.getElementById('newStudentPassword').value = '';
+        loadAdminStudents();
+      }).withFailureHandler(function() { showLoading(false); }).addStudent(name, pwd);
+    });
+    document.getElementById('btnAddProblem').addEventListener('click', function() {
+      var id = document.getElementById('newProbId').value.trim();
+      var text = document.getElementById('newProbText').value;
+      var c1 = document.getElementById('newProbC1').value;
+      var c2 = document.getElementById('newProbC2').value;
+      var c3 = document.getElementById('newProbC3').value;
+      var c4 = document.getElementById('newProbC4').value;
+      var correct = document.getElementById('newProbCorrect').value;
+      var type = document.getElementById('newProbType').value;
+      var level = document.getElementById('newProbLevel').value;
+      if (!id) { showMsg('adminProblemMsg', '問題IDを入力してください', true); return; }
+      showLoading(true);
+      google.script.run.withSuccessHandler(function(res) {
+        showLoading(false);
+        if (!res.success) { showMsg('adminProblemMsg', res.error, true); return; }
+        showMsg('adminProblemMsg', '追加しました');
+        document.getElementById('newProbId').value = '';
+        document.getElementById('newProbText').value = '';
+        document.getElementById('newProbC1').value = '';
+        document.getElementById('newProbC2').value = '';
+        document.getElementById('newProbC3').value = '';
+        document.getElementById('newProbC4').value = '';
+        document.getElementById('newProbCorrect').value = '';
+        document.getElementById('newProbLevel').value = '';
+        loadAdminProblems();
+      }).withFailureHandler(function() { showLoading(false); }).addProblem(id, text, c1, c2, c3, c4, correct, type, level);
+    });
+    document.getElementById('btnChangeTeacherPwd').addEventListener('click', function() {
+      var cur = document.getElementById('adminCurrentPwd').value;
+      var neu = document.getElementById('adminNewPwd').value;
+      if (!cur || !neu) { showMsg('adminPwdMsg', '現在のパスワードと新しいパスワードを入力してください', true); return; }
+      showLoading(true);
+      google.script.run.withSuccessHandler(function(res) {
+        showLoading(false);
+        if (!res.success) { showMsg('adminPwdMsg', res.error, true); return; }
+        showMsg('adminPwdMsg', 'パスワードを変更しました');
+        document.getElementById('adminCurrentPwd').value = '';
+        document.getElementById('adminNewPwd').value = '';
+      }).withFailureHandler(function() { showLoading(false); }).changeTeacherPassword(cur, neu);
+    });
+    document.getElementById('themeOptions').addEventListener('change', function() {
+      var r = document.querySelector('input[name="theme"]:checked');
+      if (r) applyTheme(r.value);
+    });
+    document.getElementById('modalSettingsClose').addEventListener('click', function() {
+      document.getElementById('modalSettings').classList.remove('show');
+    });
+    document.getElementById('btnSettings').addEventListener('click', function() {
+      var t = '';
+      try { t = localStorage.getItem('sq_theme') || 'light'; } catch (e) { t = 'light'; }
+      document.querySelectorAll('input[name="theme"]').forEach(function(r) { r.checked = (r.value === t); });
+      document.getElementById('modalSettings').classList.add('show');
+    });
+    document.getElementById('btnResetSettings').addEventListener('click', function() {
+      try { localStorage.removeItem('sq_theme'); } catch (e) {}
+      applyTheme('light');
+      document.querySelector('input[name="theme"][value="light"]').checked = true;
+    });
+    fillStudentSelect('loginName');
+  </script>
+</body>
+</html>
